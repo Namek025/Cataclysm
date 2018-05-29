@@ -1,2 +1,5 @@
 # Cataclysm
-Fixing cataclysm zones and quests
+
+Repositorio de servidor de Cataclysm
+
+Desarrolladores: Namek y Malganys
