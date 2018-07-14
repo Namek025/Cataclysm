@@ -157,8 +157,10 @@ enum SMART_EVENT
     SMART_EVENT_ACTION_DONE              = 72,      // eventId (SharedDefines.EventId)
     SMART_EVENT_ON_SPELLCLICK            = 73,      // clicker (unit)
     SMART_EVENT_FRIENDLY_HEALTH_PCT      = 74,      // minHpPct, maxHpPct, repeatMin, repeatMax
+    SMART_EVENT_DISTANCE_CREATURE        = 75,      // guid, entry, distance, repeat
+    SMART_EVENT_DISTANCE_GAMEOBJECT      = 76,      // guid, entry, distance, repeat
 
-    SMART_EVENT_END                      = 75
+    SMART_EVENT_END                      = 77
 };
 
 struct SmartEvent
@@ -380,6 +382,14 @@ struct SmartEvent
 		
         struct
         {
+            uint32 guid;
+            uint32 entry;
+            uint32 dist;
+            uint32 repeat;
+        } distance;
+
+        struct
+        {
             uint32 param1;
             uint32 param2;
             uint32 param3;
@@ -513,9 +523,11 @@ enum SMART_ACTION
     SMART_ACTION_REMOVE_POWER                       = 110,    // PowerType, newPower
     SMART_ACTION_GAME_EVENT_STOP                    = 111,    // GameEventId
     SMART_ACTION_GAME_EVENT_START                   = 112,    // GameEventId
+    SMART_ACTION_MOVE_OFFSET                        = 114,
+    SMART_ACTION_DISABLE_EVADE                      = 117,    // 0/1 (1 = disabled, 0 = enabled)
+    SMART_ACTION_PLAYCINEMATIC                      = 140,     // entry
 
-
-    SMART_ACTION_END                                = 113
+    SMART_ACTION_END                                = 141
 };
 
 struct SmartAction
@@ -923,6 +935,7 @@ struct SmartAction
         struct
         {
             uint32 pointId;
+            uint32 transport;
         } MoveToPos;
 
         struct
@@ -983,6 +996,11 @@ struct SmartAction
         {
             uint32 id;
         } gameEventStart;
+
+        struct
+        {
+            uint32 disable;
+        } disableEvade;
         //! Note for any new future actions
         //! All parameters must have type uint32
 
@@ -995,6 +1013,11 @@ struct SmartAction
             uint32 param5;
             uint32 param6;
         } raw;
+        
+        struct
+        {
+            uint32 entry;
+        } cinematic;
     };
 };
 
@@ -1270,6 +1293,8 @@ const uint32 SmartAIEventMask[SMART_EVENT_END][2] =
     {SMART_EVENT_ACTION_DONE,               SMART_SCRIPT_TYPE_MASK_CREATURE },
     {SMART_EVENT_ON_SPELLCLICK,             SMART_SCRIPT_TYPE_MASK_CREATURE },
     {SMART_EVENT_FRIENDLY_HEALTH_PCT,       SMART_SCRIPT_TYPE_MASK_CREATURE },
+    { SMART_EVENT_DISTANCE_CREATURE,        SMART_SCRIPT_TYPE_MASK_CREATURE },
+    { SMART_EVENT_DISTANCE_GAMEOBJECT,      SMART_SCRIPT_TYPE_MASK_CREATURE },
 };
 
 enum SmartEventFlags

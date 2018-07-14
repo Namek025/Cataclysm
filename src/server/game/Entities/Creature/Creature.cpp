@@ -52,7 +52,7 @@
 #include "World.h"
 #include "WorldPacket.h"
 
-// apply implementation of the singletons
+#include "Transport.h"
 
 TrainerSpell const* TrainerSpellData::Find(uint32 spell_id) const
 {
@@ -141,7 +141,7 @@ bool ForcedDespawnDelayEvent::Execute(uint64 /*e_time*/, uint32 /*p_time*/)
     return true;
 }
 
-Creature::Creature(bool isWorldObject): Unit(isWorldObject), MapCreature(),
+Creature::Creature(bool isWorldObject): Unit(isWorldObject), MapObject(),
 lootForPickPocketed(false), lootForBody(false), m_groupLootTimer(0), lootingGroupLowGUID(0),
 m_PlayerDamageReq(0), m_lootRecipient(0), m_lootRecipientGroup(0), m_corpseRemoveTime(0), m_respawnTime(0),
 m_respawnDelay(300), m_corpseDelay(60), m_respawnradius(0.0f), m_reactState(REACT_AGGRESSIVE),
@@ -163,6 +163,8 @@ m_creatureInfo(NULL), m_creatureData(NULL), m_path_id(0), m_formation(NULL)
     ResetLootMode(); // restore default loot mode
     TriggerJustRespawned = false;
     m_isTempWorldObject = false;
+
+    acumulativeDiff = 0;
 }
 
 Creature::~Creature()
@@ -364,7 +366,6 @@ bool Creature::UpdateEntry(uint32 Entry, uint32 team, const CreatureData* data)
     if (!GetCreatureAddon())
         SetSheath(SHEATH_STATE_MELEE);
 
-    SelectLevel(GetCreatureTemplate());
     if (team == HORDE)
         setFaction(cInfo->faction_H);
     else
@@ -384,16 +385,18 @@ bool Creature::UpdateEntry(uint32 Entry, uint32 team, const CreatureData* data)
     else
         SetUInt32Value(UNIT_NPC_FLAGS, npcflag);
 
-    SetAttackTime(BASE_ATTACK,  cInfo->baseattacktime);
-    SetAttackTime(OFF_ATTACK,   cInfo->baseattacktime);
-    SetAttackTime(RANGED_ATTACK, cInfo->rangeattacktime);
-
     SetUInt32Value(UNIT_FIELD_FLAGS, unit_flags);
     SetUInt32Value(UNIT_FIELD_FLAGS_2, cInfo->unit_flags2);
 
     SetUInt32Value(UNIT_DYNAMIC_FLAGS, dynamicflags);
 
     RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IN_COMBAT);
+
+    SetAttackTime(BASE_ATTACK, cInfo->baseattacktime);
+    SetAttackTime(OFF_ATTACK, cInfo->baseattacktime);
+    SetAttackTime(RANGED_ATTACK, cInfo->rangeattacktime);
+
+    SelectLevel(GetCreatureTemplate());
 
     SetMeleeDamageSchool(SpellSchools(cInfo->dmgschool));
     CreatureBaseStats const* stats = sObjectMgr->GetCreatureBaseStats(getLevel(), cInfo->unit_class);
@@ -550,12 +553,18 @@ void Creature::Update(uint32 diff)
             if (!isAlive())
                 break;
 
-            // if creature is charmed, switch to charmed AI
+            // if creature is charmed, switch to charmed AI (and back)
             if (NeedChangeAI)
             {
                 UpdateCharmAI();
                 NeedChangeAI = false;
                 IsAIEnabled = true;
+                if (!IsInEvadeMode() && LastCharmerGUID)
+                    if (Unit* charmer = ObjectAccessor::GetUnit(*this, LastCharmerGUID))
+                        if (canStartAttack(charmer, true))
+                            i_AI->AttackStart(charmer);
+
+                LastCharmerGUID = 0;
             }
 
             if (!IsInEvadeMode() && IsAIEnabled)
@@ -591,13 +600,13 @@ void Creature::Update(uint32 diff)
             if (!IsInEvadeMode() && (!bInCombat || IsPolymorphed())) // regenerate health if not in combat or if polymorphed
                 RegenerateHealth();
 
-            if (getPowerType() == POWER_ENERGY)
+            if (HasFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_REGENERATE_POWER))
             {
-                if (!IsVehicle() || GetVehicleKit()->GetVehicleInfo()->m_powerType != POWER_PYRITE)
+                if (getPowerType() == POWER_ENERGY)
                     Regenerate(POWER_ENERGY);
+                else
+                    RegenerateMana();
             }
-            else
-                RegenerateMana();
 
             /*if (!bIsPolymorphed) // only increase the timer if not polymorphed
                     m_regenTimer += CREATURE_REGEN_INTERVAL - diff;
@@ -1027,7 +1036,8 @@ void Creature::SaveToDB()
         return;
     }
 
-    SaveToDB(GetMapId(), data->spawnMask, GetPhaseMask());
+    uint32 mapId = GetTransport() ? GetTransport()->GetGOInfo()->moTransport.mapID : GetMapId();
+    SaveToDB(mapId, data->spawnMask, GetPhaseMask());
 }
 
 void Creature::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
@@ -1066,10 +1076,20 @@ void Creature::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
     data.phaseMask = phaseMask;
     data.displayid = displayId;
     data.equipmentId = GetCurrentEquipmentId();
-    data.posX = GetPositionX();
-    data.posY = GetPositionY();
-    data.posZ = GetPositionZMinusOffset();
-    data.orientation = GetOrientation();
+    if (!GetTransport())
+    {
+        data.posX = GetPositionX();
+        data.posY = GetPositionY();
+        data.posZ = GetPositionZMinusOffset();
+        data.orientation = GetOrientation();
+    }
+    else
+    {
+        data.posX = GetTransOffsetX();
+        data.posY = GetTransOffsetY();
+        data.posZ = GetTransOffsetZ();
+        data.orientation = GetTransOffsetO();
+    }
     data.spawntimesecs = m_respawnDelay;
     // prevent add data integrity problems
     data.spawndist = GetDefaultMovementType() == IDLE_MOTION_TYPE ? 0.0f : m_respawnradius;
@@ -1160,16 +1180,22 @@ void Creature::SelectLevel(const CreatureTemplate* cinfo)
     //damage
     //float damagemod = _GetDamageMod(rank);      // Set during loading templates into dmg_multiplier field
 
-    SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, cinfo->mindmg);
-    SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, cinfo->maxdmg);
+    float basedamage = stats->GenerateBaseDamage(cinfo);
 
-    SetBaseWeaponDamage(OFF_ATTACK, MINDAMAGE, cinfo->mindmg);
-    SetBaseWeaponDamage(OFF_ATTACK, MAXDAMAGE, cinfo->mindmg);
-    SetFloatValue(UNIT_FIELD_MINRANGEDDAMAGE, cinfo->minrangedmg);
-    SetFloatValue(UNIT_FIELD_MAXRANGEDDAMAGE, cinfo->maxrangedmg);
+    float weaponBaseMinDamage = basedamage;
+    float weaponBaseMaxDamage = basedamage * 1.5;
 
+    SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, weaponBaseMinDamage);
+    SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, weaponBaseMaxDamage);
 
-    SetModifierValue(UNIT_MOD_ATTACK_POWER, BASE_VALUE, cinfo->attackpower);
+    SetBaseWeaponDamage(OFF_ATTACK, MINDAMAGE, weaponBaseMinDamage);
+    SetBaseWeaponDamage(OFF_ATTACK, MAXDAMAGE, weaponBaseMaxDamage);
+
+    SetBaseWeaponDamage(RANGED_ATTACK, MINDAMAGE, weaponBaseMinDamage);
+    SetBaseWeaponDamage(RANGED_ATTACK, MAXDAMAGE, weaponBaseMaxDamage);
+
+    SetModifierValue(UNIT_MOD_ATTACK_POWER, BASE_VALUE, stats->AttackPower);
+    SetModifierValue(UNIT_MOD_ATTACK_POWER_RANGED, BASE_VALUE, stats->RangedAttackPower);
 
 }
 
@@ -1335,6 +1361,12 @@ bool Creature::LoadCreatureFromDB(uint32 guid, Map* map, bool addToMap)
     if (addToMap && !GetMap()->AddToMap(this))
         return false;
     return true;
+}
+
+void Creature::SetCanDualWield(bool value)
+{
+    Unit::SetCanDualWield(value);
+    UpdateDamagePhysical(OFF_ATTACK);
 }
 
 void Creature::LoadEquipment(int8 id, bool force /*= true*/)
@@ -1565,13 +1597,13 @@ void Creature::setDeathState(DeathState s)
             RemoveUnitMovementFlag(MOVEMENTFLAG_SWIMMING);
 
         SetUInt32Value(UNIT_NPC_FLAGS, cinfo->npcflag);
-        ClearUnitState(uint32(UNIT_STATE_ALL_STATE));
+        ClearUnitState(uint32(UNIT_STATE_ALL_STATE & ~UNIT_STATE_IGNORE_PATHFINDING));
         SetMeleeDamageSchool(SpellSchools(cinfo->dmgschool));
-        LoadCreaturesAddon(true);
         Motion_Initialize();
         if (GetCreatureData() && GetPhaseMask() != GetCreatureData()->phaseMask)
             SetPhaseMask(GetCreatureData()->phaseMask, false);
         Unit::setDeathState(ALIVE);
+        LoadCreaturesAddon(true);
     }
 }
 
@@ -2595,7 +2627,7 @@ void Creature::UpdateMovementFlag()
 {
     CreatureTemplate const* cinfo = GetCreatureTemplate();
 
-    if (IsMovementFlagUpdateDisable())
+    if (IsMovementFlagUpdateDisable() || m_movedPlayer)
         return ;
 
     // Set the movement flags if the creature is in that mode. (Only fly if actually in air, only swim if in water, etc)

@@ -173,6 +173,8 @@ class SmartAI : public CreatureAI
         void SetFly(bool fly = true);
 
         void SetSwim(bool swim = true);
+        
+        void SetEvadeDisabled(bool disable = true);
 
         void SetInvincibilityHpLevel(uint32 level) { mInvincibilityHpLevel = level; }
 
@@ -194,8 +196,6 @@ class SmartAI : public CreatureAI
             mDespawnState = t ? 1 : 0;
         }
         void StartDespawn() { mDespawnState = 2; }
-
-        void RemoveAuras();
 
         void OnSpellClick(Unit* clicker);
 
@@ -222,6 +222,7 @@ class SmartAI : public CreatureAI
         uint32 GetWPCount() { return mWayPoints ? mWayPoints->size() : 0; }
         bool mCanRepeatPath;
         bool mRun;
+        bool mEvadeDisabled;
         bool mCanAutoAttack;
         bool mCanCombatMove;
         bool mForcedPaused;
