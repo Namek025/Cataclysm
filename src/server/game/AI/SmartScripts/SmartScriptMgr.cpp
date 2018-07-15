@@ -582,57 +582,7 @@ bool SmartAIMgr::IsEventValid(SmartScriptHolder& e)
                         sLog->outError(LOG_FILTER_SQL, "SmartAIMgr: Entry %d SourceType %u Event %u Action %u uses invalid target_type %u, skipped.", e.entryOrGuid, e.GetScriptType(), e.event_id, e.GetActionType(), e.GetTargetType());
                         return false;
                 }
-                break;
-            case SMART_EVENT_DISTANCE_CREATURE:
-                if (e.event.distance.guid == 0 && e.event.distance.entry == 0)
-                {
-                    sLog->outError(LOG_FILTER_SQL, "SmartAIMgr: Event SMART_EVENT_DISTANCE_CREATURE did not provide creature guid or entry, skipped.");
-                    return false;
-                }
-
-                if (e.event.distance.guid != 0 && e.event.distance.entry != 0)
-                {
-                    sLog->outError(LOG_FILTER_SQL, "SmartAIMgr: Event SMART_EVENT_DISTANCE_CREATURE provided both an entry and guid, skipped.");
-                    return false;
-                }
-
-                if (e.event.distance.guid != 0 && !sObjectMgr->GetCreatureData(e.event.distance.guid))
-                {
-                    sLog->outError(LOG_FILTER_SQL, "SmartAIMgr: Event SMART_EVENT_DISTANCE_CREATURE using invalid creature guid %u, skipped.", e.event.distance.guid);
-                    return false;
-                }
-
-                if (e.event.distance.entry != 0 && !sObjectMgr->GetCreatureTemplate(e.event.distance.entry))
-                {
-                    sLog->outError(LOG_FILTER_SQL, "SmartAIMgr: Event SMART_EVENT_DISTANCE_CREATURE using invalid creature entry %u, skipped.", e.event.distance.entry);
-                    return false;
-                }
-                break;
-            case SMART_EVENT_DISTANCE_GAMEOBJECT:
-                if (e.event.distance.guid == 0 && e.event.distance.entry == 0)
-                {
-                    sLog->outError(LOG_FILTER_SQL, "SmartAIMgr: Event SMART_EVENT_DISTANCE_GAMEOBJECT did not provide gameobject guid or entry, skipped.");
-                    return false;
-                }
-
-                if (e.event.distance.guid != 0 && e.event.distance.entry != 0)
-                {
-                    sLog->outError(LOG_FILTER_SQL, "SmartAIMgr: Event SMART_EVENT_DISTANCE_GAMEOBJECT provided both an entry and guid, skipped.");
-                    return false;
-                }
-
-                if (e.event.distance.guid != 0 && !sObjectMgr->GetGOData(e.event.distance.guid))
-                {
-                    sLog->outError(LOG_FILTER_SQL, "SmartAIMgr: Event SMART_EVENT_DISTANCE_GAMEOBJECT using invalid gameobject guid %u, skipped.", e.event.distance.guid);
-                    return false;
-                }
-
-                if (e.event.distance.entry != 0 && !sObjectMgr->GetGameObjectTemplate(e.event.distance.entry))
-                {
-                    sLog->outError(LOG_FILTER_SQL, "SmartAIMgr: Event SMART_EVENT_DISTANCE_GAMEOBJECT using invalid gameobject entry %u, skipped.", e.event.distance.entry);
-                    return false;
-                }
-                break;
+                break;			
             case SMART_EVENT_GO_STATE_CHANGED:
             case SMART_EVENT_GO_EVENT_INFORM:
             case SMART_EVENT_TIMED_EVENT_TRIGGERED:
@@ -1070,9 +1020,6 @@ bool SmartAIMgr::IsEventValid(SmartScriptHolder& e)
         case SMART_ACTION_ADD_GO_FLAG:
         case SMART_ACTION_REMOVE_GO_FLAG:
         case SMART_ACTION_SUMMON_CREATURE_GROUP:
-        case SMART_ACTION_MOVE_OFFSET:
-        case SMART_ACTION_DISABLE_EVADE:
-        case SMART_ACTION_PLAYCINEMATIC:
             break;
         default:
             sLog->outError(LOG_FILTER_SQL, "SmartAIMgr: Not handled action_type(%u), event_type(%u), Entry %d SourceType %u Event %u, skipped.", e.GetActionType(), e.GetEventType(), e.entryOrGuid, e.GetScriptType(), e.event_id);

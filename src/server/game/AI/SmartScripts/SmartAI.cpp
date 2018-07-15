@@ -46,7 +46,6 @@ SmartAI::SmartAI(Creature* c) : CreatureAI(c)
     // spawn in run mode
     me->SetWalk(false);
     mRun = false;
-    mEvadeDisabled = false;
 
     me->GetPosition(&mLastOOCPos);
 
@@ -432,18 +431,26 @@ void SmartAI::MovementInform(uint32 MovementType, uint32 Data)
     MovepointReached(Data);
 }
 
+void SmartAI::RemoveAuras()
+{
+    /// @fixme: duplicated logic in CreatureAI::_EnterEvadeMode (could use RemoveAllAurasExceptType)
+    Unit::AuraApplicationMap& appliedAuras = me->GetAppliedAuras();
+    for (Unit::AuraApplicationMap::iterator iter = appliedAuras.begin(); iter != appliedAuras.end();)
+    {
+        Aura const* aura = iter->second->GetBase();
+        if (!aura->IsPassive() && !aura->HasEffectType(SPELL_AURA_CONTROL_VEHICLE) && !aura->HasEffectType(SPELL_AURA_CLONE_CASTER) && aura->GetCasterGUID() != me->GetGUID())
+            me->RemoveAura(iter);
+        else
+            ++iter;
+    }
+}
+
 void SmartAI::EnterEvadeMode()
 {
     if (!me->isAlive() || me->IsInEvadeMode())
         return;
-    
-    if (mEvadeDisabled)
-    {
-        GetScript()->ProcessEventsFor(SMART_EVENT_EVADE);
-        return;
-    }
 
-    me->RemoveAllAurasExceptType(SPELL_AURA_CONTROL_VEHICLE, SPELL_AURA_CLONE_CASTER);
+    RemoveAuras();
 
     me->AddUnitState(UNIT_STATE_EVADE);
     me->DeleteThreatList();
@@ -464,9 +471,6 @@ void SmartAI::EnterEvadeMode()
     {
         if (Unit* target = me->GetUnit(*me, mFollowGuid))
             me->GetMotionMaster()->MoveFollow(target, mFollowDist, mFollowAngle);
-
-        // evade is not cleared in MoveFollow, so we can't keep it
-        me->ClearUnitState(UNIT_STATE_EVADE);
     }
     else
         me->GetMotionMaster()->MoveTargetedHome();
@@ -748,11 +752,6 @@ void SmartAI::SetSwim(bool swim)
     else
         me->RemoveUnitMovementFlag(MOVEMENTFLAG_SWIMMING);
     me->SendMovementSwimming();
-}
-
-void SmartAI::SetEvadeDisabled(bool disable)
-{
-    mEvadeDisabled = disable;
 }
 
 void SmartAI::sGossipHello(Player* player)

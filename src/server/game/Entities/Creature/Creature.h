@@ -39,24 +39,23 @@ class CreatureGroup;
 
 enum CreatureFlagsExtra
 {
-    CREATURE_FLAG_EXTRA_INSTANCE_BIND           = 0x00000001,       // creature kill bind instance with killer and killer's group
-    CREATURE_FLAG_EXTRA_CIVILIAN                = 0x00000002,       // not aggro (ignore faction/reputation hostility)
-    CREATURE_FLAG_EXTRA_NO_PARRY                = 0x00000004,       // creature can't parry
-    CREATURE_FLAG_EXTRA_NO_PARRY_HASTEN         = 0x00000008,       // creature can't counter-attack at parry
-    CREATURE_FLAG_EXTRA_NO_BLOCK                = 0x00000010,       // creature can't block
-    CREATURE_FLAG_EXTRA_NO_CRUSH                = 0x00000020,       // creature can't do crush attacks
-    CREATURE_FLAG_EXTRA_NO_XP_AT_KILL           = 0x00000040,       // creature kill not provide XP
-    CREATURE_FLAG_EXTRA_TRIGGER                 = 0x00000080,       // trigger creature
-    CREATURE_FLAG_EXTRA_NO_TAUNT                = 0x00000100,       // creature is immune to taunt auras and effect attack me
-    CREATURE_FLAG_EXTRA_VEHICLE_ACC_DMG         = 0x00001000,       // vehicle accessory is attackable
-    CREATURE_FLAG_EXTRA_WORLDEVENT              = 0x00004000,       // custom flag for world event creatures (left room for merging)
-    CREATURE_FLAG_EXTRA_GUARD                   = 0x00008000,       // Creature is guard
-    CREATURE_FLAG_EXTRA_NO_CRIT                 = 0x00020000,       // creature can't do critical strikes
-    CREATURE_FLAG_EXTRA_NO_SKILLGAIN            = 0x00040000,       // creature won't increase weapon skills
-    CREATURE_FLAG_EXTRA_TAUNT_DIMINISH          = 0x00080000,       // Taunt is a subject to diminishing returns on this creautre
-    CREATURE_FLAG_EXTRA_ALL_DIMINISH            = 0x00100000,       // Creature is subject to all diminishing returns as player are
-    CREATURE_FLAG_EXTRA_NO_PLAYER_DAMAGE_REQ    = 0x00200000,       // creature does not need to take player damage for kill credit
-    CREATURE_FLAG_EXTRA_DUNGEON_BOSS            = 0x10000000        // creature is a dungeon boss (SET DYNAMICALLY, DO NOT ADD IN DB)
+    CREATURE_FLAG_EXTRA_INSTANCE_BIND   = 0x00000001,       // creature kill bind instance with killer and killer's group
+    CREATURE_FLAG_EXTRA_CIVILIAN        = 0x00000002,       // not aggro (ignore faction/reputation hostility)
+    CREATURE_FLAG_EXTRA_NO_PARRY        = 0x00000004,       // creature can't parry
+    CREATURE_FLAG_EXTRA_NO_PARRY_HASTEN = 0x00000008,       // creature can't counter-attack at parry
+    CREATURE_FLAG_EXTRA_NO_BLOCK        = 0x00000010,       // creature can't block
+    CREATURE_FLAG_EXTRA_NO_CRUSH        = 0x00000020,       // creature can't do crush attacks
+    CREATURE_FLAG_EXTRA_NO_XP_AT_KILL   = 0x00000040,       // creature kill not provide XP
+    CREATURE_FLAG_EXTRA_TRIGGER         = 0x00000080,       // trigger creature
+    CREATURE_FLAG_EXTRA_NO_TAUNT        = 0x00000100,       // creature is immune to taunt auras and effect attack me
+    CREATURE_FLAG_EXTRA_VEHICLE_ACC_DMG = 0x00001000,       // vehicle accessory is attackable
+    CREATURE_FLAG_EXTRA_WORLDEVENT      = 0x00004000,       // custom flag for world event creatures (left room for merging)
+    CREATURE_FLAG_EXTRA_GUARD           = 0x00008000,       // Creature is guard
+    CREATURE_FLAG_EXTRA_NO_CRIT         = 0x00020000,       // creature can't do critical strikes
+    CREATURE_FLAG_EXTRA_NO_SKILLGAIN    = 0x00040000,       // creature won't increase weapon skills
+    CREATURE_FLAG_EXTRA_TAUNT_DIMINISH  = 0x00080000,       // Taunt is a subject to diminishing returns on this creautre
+    CREATURE_FLAG_EXTRA_ALL_DIMINISH    = 0x00100000,       // Creature is subject to all diminishing returns as player are
+    CREATURE_FLAG_EXTRA_DUNGEON_BOSS    = 0x10000000        // creature is a dungeon boss (SET DYNAMICALLY, DO NOT ADD IN DB)
 };
 
 #define CREATURE_FLAG_EXTRA_DB_ALLOWED (CREATURE_FLAG_EXTRA_INSTANCE_BIND | CREATURE_FLAG_EXTRA_CIVILIAN | \
@@ -64,7 +63,7 @@ enum CreatureFlagsExtra
     CREATURE_FLAG_EXTRA_NO_CRUSH | CREATURE_FLAG_EXTRA_NO_XP_AT_KILL | CREATURE_FLAG_EXTRA_TRIGGER | \
     CREATURE_FLAG_EXTRA_NO_TAUNT | CREATURE_FLAG_EXTRA_WORLDEVENT | CREATURE_FLAG_EXTRA_NO_CRIT | \
     CREATURE_FLAG_EXTRA_NO_SKILLGAIN | CREATURE_FLAG_EXTRA_TAUNT_DIMINISH | CREATURE_FLAG_EXTRA_ALL_DIMINISH | \
-    CREATURE_FLAG_EXTRA_GUARD | CREATURE_FLAG_EXTRA_NO_PLAYER_DAMAGE_REQ)
+    CREATURE_FLAG_EXTRA_GUARD)
 
 #define MAX_KILL_CREDIT 2
 #define CREATURE_REGEN_INTERVAL 2 * IN_MILLISECONDS
@@ -183,15 +182,12 @@ typedef UNORDERED_MAP<uint32, CreatureTemplate> CreatureTemplateContainer;
 #pragma pack(push, 1)
 #endif
 
-// Defines base stats for creatures (used to calculate HP/mana/armor/attackpower/rangedattackpower/all damage).
+// Defines base stats for creatures (used to calculate HP/mana/armor).
 struct CreatureBaseStats
 {
-    uint32 BaseHealth[MAX_EXPANSIONS];
+    uint32 BaseHealth[MAX_CREATURE_BASE_HP];
     uint32 BaseMana;
     uint32 BaseArmor;
-    uint32 AttackPower;
-    uint32 RangedAttackPower;
-    float BaseDamage[MAX_EXPANSIONS];
 
     // Helpers
 
@@ -212,11 +208,6 @@ struct CreatureBaseStats
     uint32 GenerateArmor(CreatureTemplate const* info) const
     {
         return uint32(ceil(BaseArmor * info->ModArmor));
-    }
-    
-    float GenerateBaseDamage(CreatureTemplate const* info) const
-    {
-        return BaseDamage[info->expansion];
     }
 
     static CreatureBaseStats const* GetBaseStats(uint8 level, uint8 unitClass);
@@ -423,7 +414,36 @@ typedef std::map<uint32, time_t> CreatureSpellCooldowns;
 
 #define MAX_VENDOR_ITEMS 150                                // Limitation in 4.x.x item count in SMSG_LIST_INVENTORY
 
-class Creature : public Unit, public GridObject<Creature>, public MapObject
+enum CreatureCellMoveState
+{
+    CREATURE_CELL_MOVE_NONE,    // not in move list
+    CREATURE_CELL_MOVE_ACTIVE,  // in move list
+    CREATURE_CELL_MOVE_INACTIVE // in move list but should not move
+};
+
+class MapCreature
+{
+    friend class Map;              // map for moving creatures
+    friend class ObjectGridLoader; // grid loader for loading creatures
+
+protected:
+    MapCreature() : _moveState(CREATURE_CELL_MOVE_NONE) {}
+
+private:
+    Cell _currentCell;
+    Cell const& GetCurrentCell() const { return _currentCell; }
+    void SetCurrentCell(Cell const& cell) { _currentCell = cell; }
+
+    CreatureCellMoveState _moveState;
+    Position _newPosition;
+    void SetNewCellPosition(float x, float y, float z, float o)
+    {
+        _moveState = CREATURE_CELL_MOVE_ACTIVE;
+        _newPosition.Relocate(x, y, z, o);
+    }
+};
+
+class Creature : public Unit, public GridObject<Creature>, public MapCreature
 {
     public:
 
@@ -527,9 +547,8 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
         void UpdateMaxHealth();
         void UpdateMaxPower(Powers power);
         void UpdateAttackPowerAndDamage(bool ranged = false);
-        void CalculateMinMaxDamage(WeaponAttackType attType, bool normalized, bool addTotalPct, float& minDamage, float& maxDamage);
+        void UpdateDamagePhysical(WeaponAttackType attType);
 
-        void SetCanDualWield(bool value);
         uint8 GetOriginalEquipmentId() const { return m_originalEquipmentId; }
         uint32 GetCurrentEquipmentId() { return m_equipmentId; }
         void SetCurrentEquipmentId(uint8 id) { m_equipmentId = id; }
@@ -685,7 +704,7 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
 
         void SetDisableReputationGain(bool disable) { DisableReputationGain = disable; }
         bool IsReputationGainDisabled() { return DisableReputationGain; }
-        bool IsDamageEnoughForLootingAndReward() const { return (m_creatureInfo->flags_extra & CREATURE_FLAG_EXTRA_NO_PLAYER_DAMAGE_REQ) || (m_PlayerDamageReq == 0); }
+        bool IsDamageEnoughForLootingAndReward() const { return m_PlayerDamageReq == 0; }
         void LowerPlayerDamageReq(uint32 unDamage)
         {
             if (m_PlayerDamageReq)
@@ -701,6 +720,9 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
 
         float m_SightDistance, m_CombatDistance, _ReactDistance;
 
+        void SetGUIDTransport(uint32 guid) { guid_transport=guid; }
+        uint32 GetGUIDTransport() { return guid_transport; }
+
         void FarTeleportTo(Map* map, float X, float Y, float Z, float O);
 
         bool m_isTempWorldObject; //true when possessed
@@ -713,9 +735,6 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
 
         void SetSeerGUID(uint64 guid) { uiSeerGUID = guid; }
         uint64 GetSeerGUID() const { return uiSeerGUID; }
-
-        void SetDelayedUpdateTime(uint32 time) { acumulativeDiff = time; }
-        uint32 GetDelayedUpdateTime() { return acumulativeDiff; }
 		
     protected:
         bool CreateFromProto(uint32 guidlow, uint32 Entry, uint32 vehId, uint32 team, const CreatureData* data = NULL);
@@ -780,8 +799,6 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
         //Formation var
         CreatureGroup* m_formation;
         bool TriggerJustRespawned;
-
-        uint32 acumulativeDiff;
 };
 
 class AssistDelayEvent : public BasicEvent

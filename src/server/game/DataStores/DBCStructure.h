@@ -838,20 +838,11 @@ struct CinematicCameraEntry
 };
 */
 
-struct CinematicCameraEntry
-{
-    uint32 ID;                                              // 0
-    char const* Model;                                      // 1    Model filename (translate .mdx to .m2)
-    uint32 SoundID;                                         // 2    Sound ID       (voiceover for cinematic)
-    DBCPosition3D Origin;                                   // 3-5  Position in map used for basis for M2 co-ordinates
-    float OriginFacing;                                     // 4    Orientation in map used for basis for M2 co-ordinates
-};
-
 struct CinematicSequencesEntry
 {
     uint32      Id;                                         // 0 index
     //uint32      unk1;                                     // 1 always 0
-    uint32      cinematicCamera;                          // 2 id in CinematicCamera.dbc
+    //uint32      cinematicCamera;                          // 2 id in CinematicCamera.dbc
                                                             // 3-9 always 0
 };
 
@@ -1465,25 +1456,6 @@ struct LFGDungeonEntry
     uint32 Entry() const { return ID + (type << 24); }
 };
 
-struct LightEntry
-{
-    uint32 Id;
-    uint32 MapId;
-    float X;
-    float Y;
-    float Z;
-    //float FalloffStart;
-    //float FalloffEnd;
-    //uint32 SkyAndFog;
-    //uint32 WaterSettings;
-    //uint32 SunsetParams;
-    //uint32 OtherParams;
-    //uint32 DeathParams;
-    //uint32 Unknown;
-    //uint32 Unknown;
-    //uint32 Unknown;
-};
-
 
 struct LiquidTypeEntry
 {
@@ -1645,16 +1617,6 @@ struct OverrideSpellDataEntry
     uint32      spellId[MAX_OVERRIDE_SPELL];                // 1-10
     //uint32      unk0;                                     // 11
     //char*     SpellBarName;                               // 12
-};
-
-struct PowerDisplayEntry
-{
-    uint32 Id;                                              // 0
-    uint32 PowerType;                                       // 1
-    //char*  Name;                                          // 2
-    //uint32 R;                                             // 3
-    //uint32 G;                                             // 4
-    //uint32 B;                                             // 5
 };
 
 struct PvPDifficultyEntry
@@ -2290,28 +2252,6 @@ struct TotemCategoryEntry
     uint32    categoryMask;                                 // 3        m_totemCategoryMask (compatibility mask for same type: different for totems, compatible from high to low for rods)
 };
 
-struct TransportAnimationEntry
-{
-    //uint32  Id;
-    uint32  TransportEntry;
-    uint32  TimeSeg;
-    float   X;
-    float   Y;
-    float   Z;
-    //uint32  MovementId;
-};
-
-struct TransportRotationEntry
-{
-    //uint32  Id;
-    uint32  TransportEntry;
-    uint32  TimeSeg;
-    float   X;
-    float   Y;
-    float   Z;
-    float   W;
-};
-
 struct UnitPowerBarEntry
 {
     uint32  Id;
@@ -2331,6 +2271,17 @@ struct UnitPowerBarEntry
     //char*   Tooltip;
     //float   StartInset;
     //float   EndInset;
+};
+
+struct TransportAnimationEntry
+{
+    //uint32    id;                                         // 0
+    uint32    transportEntry;                               // 1
+    uint32    timeFrame;                                    // 2
+    //float     xOffs;                                      // 3
+    //float     yOffs;                                      // 4
+    //float     zOffs;                                      // 5
+    //uint32    unk;                                        // 6
 };
 
 #define MAX_VEHICLE_SEATS 8
@@ -2367,7 +2318,7 @@ struct VehicleEntry
     uint32  m_uiLocomotionType;                             // 34
     float   m_msslTrgtImpactTexRadius;                      // 35
     uint32  m_uiSeatIndicatorType;                          // 36
-    uint32  m_powerDisplayId;                               // 37, new in 3.1
+    uint32  m_powerType;                                    // 37, new in 3.1
                                                             // 38, new in 3.1
                                                             // 39, new in 3.1
 };
@@ -2424,7 +2375,7 @@ struct VehicleSeatEntry
 
     bool CanEnterOrExit() const { return m_flags & VEHICLE_SEAT_FLAG_CAN_ENTER_OR_EXIT; }
     bool CanSwitchFromSeat() const { return m_flags & VEHICLE_SEAT_FLAG_CAN_SWITCH; }
-    bool IsUsableByOverride() const { return (m_flags & VEHICLE_SEAT_FLAG_UNCONTROLLED | VEHICLE_SEAT_FLAG_UNK18)
+    bool IsUsableByOverride() const { return (m_flags & VEHICLE_SEAT_FLAG_UNCONTROLLED)
                                     || (m_flagsB & (VEHICLE_SEAT_FLAG_B_USABLE_FORCED | VEHICLE_SEAT_FLAG_B_USABLE_FORCED_2 |
                                         VEHICLE_SEAT_FLAG_B_USABLE_FORCED_3 | VEHICLE_SEAT_FLAG_B_USABLE_FORCED_4)); }
     bool IsEjectable() const { return m_flagsB & VEHICLE_SEAT_FLAG_B_EJECTABLE; }
@@ -2588,6 +2539,9 @@ struct TaxiPathNodePtr
 
 typedef Path<TaxiPathNodePtr, TaxiPathNodeEntry const> TaxiPathNodeList;
 typedef std::vector<TaxiPathNodeList> TaxiPathNodesByPath;
+
+typedef UNORDERED_MAP<uint32 /*frame*/, TransportAnimationEntry const*> TransportAnimationEntryMap;
+typedef UNORDERED_MAP<uint32, TransportAnimationEntryMap> TransportAnimationsByEntry;
 
 #define TaxiMaskSize 114
 typedef uint8 TaxiMask[TaxiMaskSize];
